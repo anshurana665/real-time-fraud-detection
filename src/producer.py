@@ -8,6 +8,7 @@ KAFKA_TOPIC = 'transactions'
 # REMEMBER: Use '127.0.0.1:9092' because of the Windows/Docker bug
 KAFKA_BOOTSTRAP_SERVERS = ['127.0.0.1:9092']
 
+print("Loading Faker...")
 fake = Faker()
 
 def get_transaction():
@@ -42,16 +43,21 @@ def json_serializer(data):
     return json.dumps(data).encode("utf-8")
 
 def main():
+    print(f"Connecting to Kafka at {KAFKA_BOOTSTRAP_SERVERS}...")
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         value_serializer=json_serializer,
         api_version=(0, 10, 1)  # <--- ADD THIS LINE
     )
+    print("Producer connected!")
 
     try:
         while True:
+            print("Generating transaction...")
             txn = get_transaction()
-            producer.send(KAFKA_TOPIC, txn)
+            print("Sending transaction...")
+            future = producer.send(KAFKA_TOPIC, txn)
+            # future.get(timeout=10) # Optional: force wait to see error
             
             # Print Fraud in RED (if your terminal supports it) or just mark it
             status = "🚨 FRAUD" if txn['is_fraud'] else "✅ LEGIT"
