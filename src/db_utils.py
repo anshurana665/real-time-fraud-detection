@@ -19,10 +19,12 @@ def create_tables():
         amount FLOAT,
         currency VARCHAR(10),
         merchant_id INT,
-        location VARCHAR(100),
+        city VARCHAR(100),       -- <--- CHANGED FROM LOCATION
         ip_address VARCHAR(20),
+        latitude FLOAT,          -- <--- NEW
+        longitude FLOAT,         -- <--- NEW
         is_weekend INT,
-        is_fraud INT      -- <--- ADDED THIS COLUMN
+        is_fraud INT
     );
     """
     

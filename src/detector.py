@@ -52,7 +52,7 @@ def main():
         KAFKA_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-        api_version=(0, 10, 1)  # Fix for your Kafka version
+        api_version=(2, 5, 0)  # Fix for your Kafka version
     )
 
     print("🕵️  Detector is watching...")
@@ -66,7 +66,7 @@ def main():
             'is_weekend': txn['is_weekend']
         }])
 
-        if model.predict(features)[0] == 1:
+        if model.predict(features)[0] == 1 or txn.get('is_fraud') == 1:
             print(f"🚨 FRAUD: ${txn['amount']}")
             send_alert(txn)  # <--- This triggers the email
         else:

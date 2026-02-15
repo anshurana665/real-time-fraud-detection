@@ -22,7 +22,7 @@ def main():
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         auto_offset_reset='earliest',
         value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-        api_version=(0, 10, 1)  # <--- ADD THIS LINE TO FIX THE ERROR
+        api_version=(2, 5, 0)  # Fix for your Kafka version
     )
 
     print(f"✅ Consumer listening on topic: {KAFKA_TOPIC}")
@@ -37,10 +37,10 @@ def main():
             insert_query = text("""
                 INSERT INTO transactions (
                     transaction_id, timestamp, user_id, amount, currency, 
-                    merchant_id, location, ip_address, is_weekend, is_fraud
+                    merchant_id, city, ip_address, latitude, longitude, is_weekend, is_fraud
                 ) VALUES (
                     :transaction_id, :timestamp, :user_id, :amount, :currency, 
-                    :merchant_id, :location, :ip_address, :is_weekend, :is_fraud
+                    :merchant_id, :city, :ip_address, :latitude, :longitude, :is_weekend, :is_fraud
                 ) ON CONFLICT (transaction_id) DO NOTHING
             """)
             

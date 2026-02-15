@@ -1,72 +1,71 @@
 import time
 import json
 import random
+import uuid
 from kafka import KafkaProducer
 from faker import Faker
+import os
 
-KAFKA_TOPIC = 'transactions'
-# REMEMBER: Use '127.0.0.1:9092' because of the Windows/Docker bug
-KAFKA_BOOTSTRAP_SERVERS = ['127.0.0.1:9092']
+# Define Kafka configuration based on environment (Docker vs Local)
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get('KAFKA_BOOTSTRAP_SERVERS', '127.0.0.1:9092')
+TOPIC_NAME = 'transactions'
 
-print("Loading Faker...")
+# Initialize Faker for synthetic data generation
 fake = Faker()
 
-def get_transaction():
-    """Generates a transaction with occasional FRAUD patterns."""
-    user_id = random.randint(1000, 1050)
+def generate_transaction():
+    user_id = random.randint(1000, 1100)
+    merchant_id = random.randint(20, 100)
     
-    # 50% chance of being Fraud for this simulation
-    is_fraud = 1 if random.random() < 0.5 else 0
+    # 20% chance of a high-value fraud transaction
+    is_anomaly = random.random() < 0.2 
     
-    # Logic: Fraudsters spend BIG or use weird locations
-    if is_fraud:
-        amount = round(random.uniform(2000.00, 9000.00), 2)  # High Amount
-        merchant_id = random.randint(900, 999)               # Suspicious Merchants
+    if is_anomaly:
+        amount = round(random.uniform(10000, 50000), 2)
+        is_fraud = 1 # Force it to be fraud
     else:
-        amount = round(random.uniform(5.00, 500.00), 2)      # Normal Amount
-        merchant_id = random.randint(1, 50)                  # Trusted Merchants
+        amount = round(random.uniform(10, 5000), 2)
+        is_fraud = 0
 
     return {
-        "transaction_id": fake.uuid4(),
-        "timestamp": time.time(),
-        "user_id": user_id,
-        "amount": amount,
-        "currency": "USD",
-        "merchant_id": merchant_id,
-        "location": fake.city(),
-        "ip_address": fake.ipv4(),
-        "is_weekend": 1 if time.localtime().tm_wday >= 5 else 0,
-        "is_fraud": is_fraud  # <--- NEW LABEL
+        'transaction_id': str(uuid.uuid4()),
+        'timestamp': time.time(),
+        'user_id': user_id,
+        'amount': amount,
+        'currency': 'USD',
+        'merchant_id': merchant_id,
+        'ip_address': fake.ipv4(),
+        'city': fake.city(),
+        # Focus coordinates on the US East Coast (approx NY/NJ area) so they cluster nicely
+        'latitude': round(random.uniform(39.0, 42.0), 6), 
+        'longitude': round(random.uniform(-75.0, -73.0), 6),
+        'is_weekend': 1 if time.localtime(time.time()).tm_wday >= 5 else 0, # Kept for compatibility
+        'is_fraud': is_fraud 
     }
 
-def json_serializer(data):
-    return json.dumps(data).encode("utf-8")
-
-def main():
-    print(f"Connecting to Kafka at {KAFKA_BOOTSTRAP_SERVERS}...")
+def run_producer():
+    """
+    Initializes Kafka Producer and streams data continuously.
+    """
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-        value_serializer=json_serializer,
-        api_version=(0, 10, 1)  # <--- ADD THIS LINE
+        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+        api_version=(2, 5, 0) # Ensure compatibility with newer brokers
     )
-    print("Producer connected!")
+    print(f"✅ Producer connected to Kafka at {KAFKA_BOOTSTRAP_SERVERS}")
+    print("🚀 Starting transaction stream (with Geospatial Data)...")
 
     try:
         while True:
-            print("Generating transaction...")
-            txn = get_transaction()
-            print("Sending transaction...")
-            future = producer.send(KAFKA_TOPIC, txn)
-            # future.get(timeout=10) # Optional: force wait to see error
-            
-            # Print Fraud in RED (if your terminal supports it) or just mark it
-            status = "🚨 FRAUD" if txn['is_fraud'] else "✅ LEGIT"
-            print(f"Sent: {status} | User {txn['user_id']} | ${txn['amount']}")
-            
-            time.sleep(0.5)
-            
+            transaction = generate_transaction()
+            producer.send(TOPIC_NAME, transaction)
+            # Print a brief log to terminal
+            print(f"Sent: {transaction['transaction_id'][:8]} | ${transaction['amount']} | {transaction['city']}")
+            # Slightly faster generation rate
+            time.sleep(random.uniform(0.5, 1.5))
     except KeyboardInterrupt:
+        print("\n🛑 Producer stopped by user.")
         producer.close()
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    run_producer()
